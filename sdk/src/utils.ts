@@ -1478,7 +1478,7 @@ export const createNativeAtaWithTransferInstructions = (
 const _createNativeAtaInstructions = (
   nativeAccount: PublicKey,
   owner: PublicKey,
-  network: Network,
+  _network: Network,
   nativeAmount?: number
 ): WrappedNativeTransferInstructions | WrappedNativeInstructions => {
   const createIx = SystemProgram.createAccount({

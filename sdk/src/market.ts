@@ -6,7 +6,6 @@ import {
   TOKEN_PROGRAM_ID
 } from '@solana/spl-token'
 import {
-  Account,
   ComputeBudgetProgram,
   Connection,
   Keypair,
