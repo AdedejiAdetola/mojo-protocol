@@ -1,5 +1,10 @@
 import { BN, Program, utils, Provider } from '@project-serum/anchor'
-import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  NATIVE_MINT,
+  Token,
+  TOKEN_PROGRAM_ID
+} from '@solana/spl-token'
 import {
   ComputeBudgetProgram,
   Connection,
@@ -21,6 +26,7 @@ import {
 import {
   calculateClaimAmount,
   computeUnitsInstruction,
+  createNativeAtaInstructions,
   feeToTickSpacing,
   getFeeTierAddress,
   getMaxTick,
@@ -48,6 +54,8 @@ export const TICK_CROSSES_PER_IX = 19
 export const TICK_VIRTUAL_CROSSES_PER_IX = 10
 export const FEE_TIER = 'feetierv1'
 export const DEFAULT_PUBLIC_KEY = new PublicKey(0)
+export const MAX_SPL_POSITION_FOR_CLAIM_ALL = 2
+export const MAX_NATIVE_POSITION_FOR_CLAIM_ALL = 2
 
 export class Market {
   public connection: Connection
@@ -1077,6 +1085,160 @@ export class Market {
     await signAndSend(tx, [signer], this.connection)
   }
 
+  async claimAllFees(params: ClaimAllFee, signer: Keypair) {
+    const txs = await this.claimAllFeesTxs(params)
+    for (const { tx, additionalSigner } of txs) {
+      if (additionalSigner) {
+        await signAndSend(tx, [signer, additionalSigner], this.connection)
+      } else {
+        await signAndSend(tx, [signer], this.connection)
+      }
+    }
+  }
+
+  async claimAllFeesTxs({
+    owner,
+    positions
+  }: ClaimAllFee): Promise<{ tx: Transaction; additionalSigner?: Keypair }[]> {
+    owner ??= this.wallet.publicKey
+
+    const pools: Record<string, PoolStructure> = {}
+    const ixs: TransactionInstruction[] = []
+    const nativeIxs: TransactionInstruction[] = []
+    const splPositions: ClaimAllFeePosition[] = []
+    const nativePositions: ClaimAllFeePosition[] = []
+    const atas: {
+      keypair: Keypair
+      createIx: TransactionInstruction
+      initIx: TransactionInstruction
+      unwrapIx: TransactionInstruction
+    }[] = []
+
+    const pairs: Pair[] = Array.from(new Set(positions.map(p => p.pair)))
+
+    const poolStructures = await Promise.all([...pairs.map(pair => this.getPool(pair))])
+
+    for (const pair of pairs) {
+      const poolPubkey = (await pair.getAddress(this.program.programId)).toBase58()
+      pools[poolPubkey] = poolStructures.find(
+        p =>
+          p.tokenX.equals(pair.tokenX) &&
+          p.tokenY.equals(pair.tokenY) &&
+          p.tickSpacing === pair.feeTier.tickSpacing &&
+          p.fee === pair.feeTier.fee
+      )!
+    }
+
+    for (const position of positions) {
+      if (position.pair.tokenX.equals(NATIVE_MINT) || position.pair.tokenY.equals(NATIVE_MINT)) {
+        nativePositions.push(position)
+      } else {
+        splPositions.push(position)
+      }
+    }
+
+    if (nativePositions.length != 0) {
+      const requiredAtas = Math.ceil(nativePositions.length / MAX_NATIVE_POSITION_FOR_CLAIM_ALL)
+
+      for (let i = 0; i < requiredAtas; i++) {
+        const nativeAta = Keypair.generate()
+        const { createIx, initIx, unwrapIx } = createNativeAtaInstructions(
+          nativeAta.publicKey,
+          owner,
+          this.network
+        )
+        atas.push({
+          keypair: nativeAta,
+          createIx,
+          initIx,
+          unwrapIx
+        })
+      }
+
+      for (const [n, { index, pair }] of nativePositions.entries()) {
+        const idx = Math.floor(n / MAX_NATIVE_POSITION_FOR_CLAIM_ALL)
+
+        const userTokenX = pair.tokenX.equals(NATIVE_MINT)
+          ? atas[idx].keypair.publicKey
+          : await Token.getAssociatedTokenAddress(
+              ASSOCIATED_TOKEN_PROGRAM_ID,
+              TOKEN_PROGRAM_ID,
+              pair.tokenX,
+              owner,
+              false
+            )
+        const userTokenY = pair.tokenY.equals(NATIVE_MINT)
+          ? atas[idx].keypair.publicKey
+          : await Token.getAssociatedTokenAddress(
+              ASSOCIATED_TOKEN_PROGRAM_ID,
+              TOKEN_PROGRAM_ID,
+              pair.tokenY,
+              owner,
+              false
+            )
+
+        const claimIx = await this.claimFeeInstruction({
+          index,
+          pair,
+          userTokenX,
+          userTokenY,
+          owner
+        })
+
+        nativeIxs.push(claimIx)
+      }
+    }
+
+    if (splPositions.length != 0) {
+      for (const position of splPositions) {
+        const { pair, index } = position
+
+        const userTokenX = await Token.getAssociatedTokenAddress(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          pair.tokenX,
+          owner
+        )
+
+        const userTokenY = await Token.getAssociatedTokenAddress(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          pair.tokenY,
+          owner
+        )
+
+        const claimIx = await this.claimFeeInstruction({
+          index,
+          pair,
+          userTokenX,
+          userTokenY,
+          owner
+        })
+        ixs.push(claimIx)
+      }
+    }
+
+    let txs: { tx: Transaction; additionalSigner?: Keypair }[] = []
+
+    for (let i = 0; i < ixs.length; i += MAX_SPL_POSITION_FOR_CLAIM_ALL) {
+      txs.push({ tx: new Transaction().add(...ixs.slice(i, i + MAX_SPL_POSITION_FOR_CLAIM_ALL)) })
+    }
+
+    for (let i = 0; i < nativeIxs.length; i += MAX_NATIVE_POSITION_FOR_CLAIM_ALL) {
+      const idx = i === 0 ? 0 : Math.floor(i / MAX_SPL_POSITION_FOR_CLAIM_ALL)
+      txs.push({
+        tx: new Transaction()
+          .add(atas[idx].createIx)
+          .add(atas[idx].initIx)
+          .add(...nativeIxs.slice(i, i + MAX_NATIVE_POSITION_FOR_CLAIM_ALL))
+          .add(atas[idx].unwrapIx),
+        additionalSigner: atas[idx].keypair
+      })
+    }
+
+    return txs
+  }
+
   async withdrawProtocolFeeInstruction(withdrawProtocolFee: WithdrawProtocolFee) {
     const { pair, accountX, accountY } = withdrawProtocolFee
     const admin = withdrawProtocolFee.admin ?? this.wallet.publicKey
@@ -1682,4 +1844,16 @@ export interface PositionInitData {
 
 export interface PositionWithAddress extends Position {
   address: PublicKey
+}
+
+export interface ClaimAllFee {
+  positions: ClaimAllFeePosition[]
+  owner?: PublicKey
+}
+
+export interface ClaimAllFeePosition {
+  pair: Pair
+  index: number
+  lowerTickIndex: number
+  upperTickIndex: number
 }

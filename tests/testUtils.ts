@@ -1,6 +1,6 @@
-import { Connection, Keypair, PublicKey } from '@solana/web3.js'
+import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js'
 import { TokenInstructions } from '@project-serum/serum'
-import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { FeeTier, Market, Position, Tick } from '@invariant-labs/sdk/lib/market'
 import {
   CreateFeeTier,
@@ -20,6 +20,7 @@ import BN from 'bn.js'
 import { Pair, TICK_LIMIT, calculatePriceSqrt, LIQUIDITY_DENOMINATOR } from '@invariant-labs/sdk'
 import { assert } from 'chai'
 import { ApyPoolParams } from '@invariant-labs/sdk/lib/utils'
+import { signAndSend } from '@invariant-labs/sdk'
 
 export async function assertThrowsAsync(fn: Promise<any>, word?: string) {
   try {
@@ -394,6 +395,31 @@ export const jsonArrayToTicks = (data: any[]) => {
   })
 
   return ticks
+}
+
+export const createAssociatedTokenAccount = async (
+  connection: Connection,
+  token: Token,
+  wallet: Keypair
+): Promise<PublicKey> => {
+  const address = await Token.getAssociatedTokenAddress(
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    token.publicKey,
+    wallet.publicKey
+  )
+  const ix = Token.createAssociatedTokenAccountInstruction(
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    token.publicKey,
+    address,
+    wallet.publicKey,
+    wallet.publicKey
+  )
+
+  const tx = new Transaction().add(ix)
+  await signAndSend(tx, [wallet], connection)
+  return address
 }
 
 export const usdcUsdhPoolSnapshot = {
