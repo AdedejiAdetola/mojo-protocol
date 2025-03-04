@@ -6,10 +6,11 @@ import {
   Keypair,
   PublicKey,
   sendAndConfirmRawTransaction,
+  SystemProgram,
   Transaction,
   TransactionInstruction
 } from '@solana/web3.js'
-import { calculatePriceSqrt, MAX_TICK, Pair, TICK_LIMIT, Market } from '.'
+import { calculatePriceSqrt, MAX_TICK, Pair, TICK_LIMIT, Market, Network } from '.'
 import {
   Decimal,
   FeeTier,
@@ -39,7 +40,7 @@ import {
 } from './math'
 import { alignTickToSpacing, getTickFromPrice } from './tick'
 import { getNextTick, getPreviousTick, getSearchLimit } from './tickmap'
-import { u64 } from '@solana/spl-token'
+import { NATIVE_MINT, Token, TOKEN_PROGRAM_ID, u64 } from '@solana/spl-token'
 import { TokenInfo, TokenListContainer, TokenListProvider } from '@solana/spl-token-registry'
 
 export const SEED = 'Invariant'
@@ -1450,6 +1451,86 @@ export const calculatePoolLiquidity = (
     },
     { x: new BN(0), y: new BN(0) }
   )
+}
+
+export const createNativeAtaInstructions = (
+  nativeAccount: PublicKey,
+  owner: PublicKey,
+  network: Network
+) => {
+  return _createNativeAtaInstructions(nativeAccount, owner, network) as WrappedNativeInstructions
+}
+
+export const createNativeAtaWithTransferInstructions = (
+  nativeAccount: PublicKey,
+  owner: PublicKey,
+  network: Network,
+  nativeAmount: number
+) => {
+  return _createNativeAtaInstructions(
+    nativeAccount,
+    owner,
+    network,
+    nativeAmount
+  ) as WrappedNativeTransferInstructions
+}
+
+const _createNativeAtaInstructions = (
+  nativeAccount: PublicKey,
+  owner: PublicKey,
+  network: Network,
+  nativeAmount?: number
+): WrappedNativeTransferInstructions | WrappedNativeInstructions => {
+  const createIx = SystemProgram.createAccount({
+    fromPubkey: owner,
+    newAccountPubkey: nativeAccount,
+    lamports: 2039280,
+    space: 165,
+    programId: TOKEN_PROGRAM_ID
+  })
+
+  const initIx = Token.createInitAccountInstruction(
+    TOKEN_PROGRAM_ID,
+    NATIVE_MINT,
+    nativeAccount,
+    owner
+  )
+  const unwrapIx = Token.createCloseAccountInstruction(
+    TOKEN_PROGRAM_ID,
+    nativeAccount,
+    owner,
+    owner,
+    []
+  )
+
+  if (!nativeAmount) {
+    return {
+      createIx,
+      initIx,
+      unwrapIx
+    }
+  }
+
+  const transferIx = SystemProgram.transfer({
+    fromPubkey: owner,
+    toPubkey: nativeAccount,
+    lamports: nativeAmount
+  })
+  return {
+    createIx,
+    transferIx,
+    initIx,
+    unwrapIx
+  }
+}
+
+export interface WrappedNativeInstructions {
+  createIx: TransactionInstruction
+  initIx: TransactionInstruction
+  unwrapIx: TransactionInstruction
+}
+export interface WrappedNativeTransferInstructions extends WrappedNativeInstructions {
+  transferIx: TransactionInstruction
 }
 
 export interface TokenData {

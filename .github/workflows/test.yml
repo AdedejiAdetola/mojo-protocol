@@ -60,6 +60,7 @@ jobs:
             'npm run test:referral-all',
             'npm run test:referral-none',
             'npm run test:referral-jupiter',
+            'npm run test:claim-all',
             'cargo test --features "all"',
             'cargo test --features "none"',
             'cargo test --features "jupiter"'
