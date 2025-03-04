@@ -112,7 +112,7 @@ jobs:
           node-version: '18'
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: 1.76
           override: true
       - name: install global mocha
         run: |
