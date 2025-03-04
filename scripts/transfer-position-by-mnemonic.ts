@@ -6,6 +6,7 @@ import { derivePath } from 'ed25519-hd-key'
 
 const RECEIVER_PUBKEY = new PublicKey(0)
 const MNEMONIC = ''
+const POSITION_INDEX = 0
 
 const provider = Provider.local(
   'https://mainnet.helius-rpc.com/?api-key=ef843b40-9876-4a02-a181-a1e6d3e61b4c',
@@ -17,7 +18,6 @@ const provider = Provider.local(
 const connection = provider.connection
 
 const main = async () => {
-  const positionIndex = 0
   const market = await Market.build(Network.MAIN, provider.wallet, connection)
   const seed = await bip39.mnemonicToSeed(MNEMONIC)
   const derivationPath = "m/44'/501'/0'/0'"
@@ -26,11 +26,13 @@ const main = async () => {
   console.log(
     `Transfering position from ${keypair.publicKey.toString()} to ${RECEIVER_PUBKEY.toString()}`
   )
+  const position = await market.getPosition(keypair.publicKey, POSITION_INDEX)
+  console.log('Position to be transfered:\n', position)
   try {
     const tx = await market.transferPositionOwnershipTransaction({
       owner: keypair.publicKey,
       recipient: RECEIVER_PUBKEY,
-      index: positionIndex
+      index: POSITION_INDEX
     })
 
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash()
