@@ -38,7 +38,7 @@ use anchor_lang::solana_program::system_program;
 pub struct CreateState<'info> {
     #[account(
         init,
-        seeds = [b"state"],
+        seeds = [b"statev1"],
         bump,
         payer = admin,
         space = 8 + std::mem::size_of::<State>()

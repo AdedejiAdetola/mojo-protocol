@@ -10,7 +10,7 @@ use anchor_lang::solana_program::system_program;
 pub struct CreateFeeTier<'info> {
     #[account(
         init,
-        seeds = [b"feetier", program_id.as_ref(), &fee.to_le_bytes(), &tick_spacing.to_le_bytes()],
+        seeds = [b"feetierv1", program_id.as_ref(), &fee.to_le_bytes(), &tick_spacing.to_le_bytes()],
         bump,
         payer = admin,
         space = 8 + std::mem::size_of::<FeeTier>() // ensure enough space is allocated
@@ -18,7 +18,7 @@ pub struct CreateFeeTier<'info> {
     pub fee_tier: AccountLoader<'info, FeeTier>,
 
     #[account(
-        seeds = [b"state".as_ref()],
+        seeds = [b"statev1".as_ref()],
         bump = state.load()?.bump
     )]
     pub state: AccountLoader<'info, State>,
