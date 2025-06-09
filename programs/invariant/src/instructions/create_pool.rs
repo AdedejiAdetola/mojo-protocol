@@ -55,7 +55,7 @@ pub struct CreatePool<'info> {
 
 impl<'info> CreatePool<'info> {
     pub fn handler(&self, init_tick: i32, bump: u8) -> ProgramResult {
-        msg!("INVARIANT: CREATE POOL");
+        msg!("MOJO: CREATE POOL");
 
         let token_x_address = &self.token_x.key();
         let token_y_address = &self.token_y.key();

@@ -50,7 +50,7 @@ pub struct UpdateSecondsPerLiquidity<'info> {
 
 impl<'info> UpdateSecondsPerLiquidity<'info> {
     pub fn handler(&self) -> ProgramResult {
-        msg!("INVARIANT: UPDATE SECOND PER LIQUIDITY");
+        msg!("MOJO: UPDATE SECOND PER LIQUIDITY");
 
         let pool = &mut self.pool.load_mut()?;
         let lower_tick = *self.lower_tick.load()?;

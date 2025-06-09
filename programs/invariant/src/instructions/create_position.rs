@@ -121,7 +121,7 @@ impl<'info> CreatePosition<'info> {
         slippage_limit_upper: Price,
         bump: u8,
     ) -> ProgramResult {
-        msg!("INVARIANT: CREATE POSITION");
+        msg!("MOJO: CREATE POSITION");
 
         let mut position = self.position.load_init()?;
         let mut pool = &mut self.pool.load_mut()?;

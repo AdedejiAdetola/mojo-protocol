@@ -124,7 +124,7 @@ impl<'info> RemovePosition<'info> {
         lower_tick_index: i32,
         upper_tick_index: i32,
     ) -> ProgramResult {
-        msg!("INVARIANT: REMOVE POSITION");
+        msg!("MOJO: REMOVE POSITION");
 
         let state = self.state.load()?;
         let mut position_list = self.position_list.load_mut()?;

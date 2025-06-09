@@ -133,7 +133,7 @@ impl<'info> Swap<'info> {
         by_amount_in: bool, // whether amount specifies input or output
         sqrt_price_limit: u128,
     ) -> ProgramResult {
-        msg!("INVARIANT: SWAP");
+        msg!("MOJO: SWAP");
         require!(amount != 0, ZeroAmount);
 
         let sqrt_price_limit = Price::new(sqrt_price_limit);

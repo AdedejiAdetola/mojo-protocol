@@ -74,7 +74,7 @@ impl<'info> SendTokens<'info> for WithdrawProtocolFee<'info> {
 
 impl<'info> WithdrawProtocolFee<'info> {
     pub fn handler(&self) -> ProgramResult {
-        msg!("INVARIANT: WITHDRAW PROTOCOL FEE");
+        msg!("MOJO: WITHDRAW PROTOCOL FEE");
 
         let state = self.state.load()?;
         let mut pool = self.pool.load_mut()?;

@@ -42,7 +42,7 @@ pub struct CreateTick<'info> {
 
 impl<'info> CreateTick<'info> {
     pub fn handler(&self, index: i32, bump: u8) -> ProgramResult {
-        msg!("INVARIANT: CREATE_TICK");
+        msg!("MOJO: CREATE_TICK");
 
         let mut tick = self.tick.load_init()?;
         let pool = self.pool.load()?;

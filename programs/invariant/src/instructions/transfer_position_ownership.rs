@@ -50,7 +50,7 @@ pub struct TransferPositionOwnership<'info> {
 
 impl<'info> TransferPositionOwnership<'info> {
     pub fn handler(&self, index: u32, bump: u8) -> ProgramResult {
-        msg!("INVARIANT: TRANSFER POSITION");
+        msg!("MOJO: TRANSFER POSITION");
 
         let mut owner_list = self.owner_list.load_mut()?;
         let mut recipient_list = self.recipient_list.load_mut()?;

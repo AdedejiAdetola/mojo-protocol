@@ -62,7 +62,7 @@ pub struct CreateState<'info> {
 }
 
 pub fn handler(ctx: Context<CreateState>, nonce: u8) -> Result<()> {
-    msg!("MOJO-AMM: Initializing Global State");
+    msg!("MOJO: Initializing Global State");
 
     let state = &mut ctx.accounts.state.load_init()?;
 
